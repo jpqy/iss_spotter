@@ -1,26 +1,46 @@
 const { fetchMyIP, fetchCoordsByIP, fetchISSFlyOverTimes } = require('./iss');
 
-fetchMyIP((error, ip) => {
-  if (error) {
-    console.log("It didn't work!", error);
-    return;
-  }
 
-  console.log('It worked! Returned IP:', ip);
-
-  fetchCoordsByIP(ip, (error, coords) => {
+const parseDateToString = (unixTimeStamp) => {
+  const date = new Date(unixTimeStamp * 1000);
+  return `${date.toDateString()} ${date.toTimeString()}`;
+};
+/**
+ * Orchestrates multiple API requests in order to determine the next 5 upcoming ISS fly overs for the user's current location.
+ * Input:
+ *   - A callback with an error or results. 
+ * Returns (via Callback):
+ *   - An error, if any (nullable)
+ *   - The fly-over times as an array (null if error):
+ *     [ { risetime: <number>, duration: <number> }, ... ]
+ */
+const nextISSTimesForMyLocation = function(callback) {
+  fetchMyIP((error, ip) => {
     if (error) {
-      console.log("It didn't work!", error);
-      return;
+      return callback(Error("IP retrieval didn't work!"), null);
     }
-    console.log('It worked! Returned coordinates:', coords);
-
-    fetchISSFlyOverTimes(coords, (error, times) => {
+    fetchCoordsByIP(ip, (error, coords) => {
       if (error) {
-        console.log("It didn't work!", error);
-        return;
+        return callback(Error("Fetching coordinates didn't work!", null));
       }
-      console.log('It worked! Returned times:', times);
+
+      fetchISSFlyOverTimes(coords, (error, times) => {
+        if (error) {
+          return callback(Error("Fetching flyby times didn't work!", null));
+        }
+        for (const time in times) {
+          console.log(`Next pass at ${parseDateToString(times[time].risetime)} for ${times[time].duration} seconds!`);
+        }
+      });
     });
   });
+};
+
+console.log('Date: ', parseDateToString(1584040140));
+nextISSTimesForMyLocation((error, passTimes) => {
+  if (error) {
+    return console.log("It didn't work!", error);
+  }
+  // success, print out the deets!
+  console.log(passTimes);
 });
